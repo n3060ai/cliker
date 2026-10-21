@@ -1,0 +1,828 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Sweet Spot Clicker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=DM+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* Layout: arcade cabinet. Tall stage on the left with a hard offset shadow, ledger of spots on the right. */
+  :root {
+    --bg: #eceff3;
+    --panel: #fbfcfd;
+    --ink: #16212c;
+    --muted: #586677;
+    --line: #cfd6de;
+    --accent: #d62f6b;
+    --accent-ink: #ffffff;
+    --gold: #ffcf33;
+    --fixed-ink: #16212c;
+    --veil: rgba(22, 33, 44, 0.55);
+    --rc-common: #6f7b88;
+    --rc-rare: #2a74d6;
+    --rc-epic: #8247da;
+    --rc-legend: #b87800;
+    --font-display: 'Dela Gothic One', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+    --font-body: 'Zen Kaku Gothic New', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+    --font-mono: 'DM Mono', ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f141a;
+      --panel: #18202a;
+      --ink: #e8edf3;
+      --muted: #97a6b6;
+      --line: #27323f;
+      --accent: #ff5c93;
+      --accent-ink: #1a0a12;
+      --veil: rgba(4, 8, 12, 0.7);
+      --rc-common: #8c98a5;
+      --rc-rare: #5aa2ff;
+      --rc-epic: #b58bff;
+      --rc-legend: #ffcf3d;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f141a;
+    --panel: #18202a;
+    --ink: #e8edf3;
+    --muted: #97a6b6;
+    --line: #27323f;
+    --accent: #ff5c93;
+    --accent-ink: #1a0a12;
+    --veil: rgba(4, 8, 12, 0.7);
+    --rc-common: #8c98a5;
+    --rc-rare: #5aa2ff;
+    --rc-epic: #b58bff;
+    --rc-legend: #ffcf3d;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+    padding-block: 20px 56px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .app { max-width: 1040px; margin: 0 auto; }
+
+  .top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px 24px; margin-bottom: 24px; }
+  .eyebrow { margin: 0 0 4px; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  h1 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: clamp(24px, 4.4vw, 38px); line-height: 1.15; text-wrap: balance; }
+  .score { text-align: right; }
+  .score-label { display: block; font-size: 12px; letter-spacing: 0.1em; color: var(--muted); }
+  .score-num { display: inline-block; font-family: var(--font-display); font-size: clamp(40px, 9vw, 68px); line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .score-num.bump { animation: bump 0.18s ease-out; }
+  @keyframes bump { 0% { transform: scale(1.12); } 100% { transform: scale(1); } }
+
+  .board {
+    --ratio: 0.684;
+    display: grid;
+    grid-template-columns: minmax(0, min(568px, calc(max(300px, 100svh - 150px) * var(--ratio) + 8px))) minmax(0, 1fr);
+    gap: 40px;
+    align-items: start;
+  }
+  @media (max-width: 860px) {
+    .board { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  }
+
+  .stage-col { min-width: 0; display: flex; flex-direction: column; gap: 16px; padding-right: 8px; padding-bottom: 8px; }
+  .stage {
+    position: relative;
+    aspect-ratio: var(--ar, 832 / 1216);
+    width: min(100%, calc(max(300px, 100svh - 150px) * var(--ratio)), 560px);
+    border: 3px solid var(--ink);
+    background: var(--panel);
+    box-shadow: 8px 8px 0 var(--accent);
+    overflow: hidden;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .stage.picking { cursor: crosshair; }
+  .stage img { display: block; width: 100%; height: 100%; object-fit: fill; pointer-events: none; transition: transform 0.08s ease-out; }
+  .stage.pop img { transform: scale(0.992); }
+  .stage.flash { animation: flash 0.4s ease-out; }
+  @keyframes flash { 0% { box-shadow: 8px 8px 0 var(--gold); } 100% { box-shadow: 8px 8px 0 var(--accent); } }
+  .layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .ring { position: absolute; transform: translate(-50%, -50%); border: 2px dashed var(--rc, var(--accent)); border-radius: 50%; background: rgba(255, 255, 255, 0.12); }
+  .pick-mark { position: absolute; width: 18px; height: 18px; transform: translate(-50%, -50%); border: 2px solid var(--accent); border-radius: 50%; background: rgba(255, 255, 255, 0.5); }
+
+  .float {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    font-family: var(--font-display);
+    font-size: 22px;
+    line-height: 1;
+    color: var(--gold);
+    text-shadow: 2px 0 var(--fixed-ink), -2px 0 var(--fixed-ink), 0 2px var(--fixed-ink), 0 -2px var(--fixed-ink), 2px 2px var(--fixed-ink), -2px -2px var(--fixed-ink), 2px -2px var(--fixed-ink), -2px 2px var(--fixed-ink);
+    animation: rise 0.9s ease-out forwards;
+    white-space: nowrap;
+  }
+  .float.big { font-size: 34px; color: #fff; text-shadow: 2px 0 var(--accent), -2px 0 var(--accent), 0 2px var(--accent), 0 -2px var(--accent), 2px 2px var(--accent), -2px -2px var(--accent), 2px -2px var(--accent), -2px 2px var(--accent), 0 4px 0 var(--fixed-ink); }
+  .float.tag { font-size: 16px; }
+  @keyframes rise { from { opacity: 1; transform: translate(-50%, -50%); } to { opacity: 0; transform: translate(-50%, -200%); } }
+  .bit { position: absolute; font-size: 22px; line-height: 1; transform: translate(-50%, -50%); text-shadow: 0 0 3px var(--fixed-ink); animation: burst 0.7s ease-out forwards; }
+  @keyframes burst { from { opacity: 1; transform: translate(-50%, -50%) scale(1); } to { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.4) rotate(var(--rot)); } }
+  @keyframes fade { from { opacity: 1; } to { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .float { animation-name: fade; }
+    .bit { display: none; }
+    .score-num.bump, .stage.flash { animation: none; }
+    .stage img { transition: none; }
+  }
+
+  .hint { margin: 0; font-size: 13px; color: var(--muted); max-width: 560px; }
+  .picker-out { margin: 0; font-family: var(--font-mono); font-size: 13px; padding: 8px 10px; border: 2px dashed var(--accent); max-width: 560px; word-break: break-all; }
+
+  .side { min-width: 0; display: flex; flex-direction: column; gap: 28px; }
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; border-top: 3px solid var(--ink); padding-top: 12px; }
+  .stat-label { display: block; font-size: 12px; color: var(--muted); letter-spacing: 0.06em; }
+  .stat-val { font-family: var(--font-mono); font-size: 24px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .goal { display: grid; gap: 6px; }
+  .goal-row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--muted); }
+  .goal-row b { font-family: var(--font-mono); font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .bar { height: 12px; border: 2px solid var(--ink); background: var(--panel); }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.25s ease-out; }
+
+  h2 { margin: 0 0 8px; font-family: var(--font-display); font-weight: 400; font-size: 18px; }
+  .spots { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+  .spot { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 10px 4px; border-bottom: 1px solid var(--line); }
+  .spot.flash { animation: rowflash 1.2s ease-out; }
+  @keyframes rowflash { 0% { background: color-mix(in srgb, var(--gold) 55%, transparent); } 100% { background: transparent; } }
+  .pill { justify-self: start; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; padding: 1px 8px; border: 1.5px solid var(--rc); color: var(--rc); white-space: nowrap; }
+  .spot-name { display: block; font-weight: 700; }
+  .spot.locked .spot-name { color: var(--muted); letter-spacing: 0.2em; }
+  .spot-desc { display: block; font-size: 13px; color: var(--muted); }
+  .mult { font-family: var(--font-mono); font-size: 14px; color: var(--rc); font-variant-numeric: tabular-nums; }
+
+  .btn { font: inherit; font-weight: 700; padding: 9px 16px; border: 2px solid var(--ink); background: var(--panel); color: var(--ink); cursor: pointer; box-shadow: 3px 3px 0 var(--ink); }
+  .btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
+  .btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); }
+  .btn.small { padding: 6px 12px; font-size: 13px; }
+  .btn:focus-visible, input:focus-visible, textarea:focus-visible, .stage:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    transform: translate(-50%, 24px);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 40;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    max-width: min(480px, calc(100% - 32px));
+    padding: 10px 16px;
+    background: var(--ink);
+    color: var(--bg);
+    border: 2px solid var(--accent);
+    box-shadow: 4px 4px 0 var(--accent);
+    transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .toast .pill { border-color: currentColor; color: var(--gold); background: transparent; }
+  .toast-title { display: block; font-weight: 700; }
+  .toast-sub { display: block; font-size: 13px; opacity: 0.8; }
+
+  .modal {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: grid;
+    place-items: center;
+    background: var(--veil);
+    padding-block: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .card { width: min(580px, 100%); max-height: 100%; overflow-y: auto; background: var(--panel); border: 3px solid var(--ink); box-shadow: 8px 8px 0 var(--accent); padding: 24px; display: grid; gap: 16px; }
+  .card h3 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 24px; text-wrap: balance; }
+  .card p { margin: 0; }
+  .result { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; border-top: 2px solid var(--ink); padding-top: 12px; }
+  .field { display: grid; gap: 4px; }
+  .field label, .legend { font-size: 13px; font-weight: 700; }
+  .field small { color: var(--muted); font-size: 12px; }
+  input[type="number"] { font: inherit; font-family: var(--font-mono); width: 100%; padding: 6px 8px; border: 2px solid var(--ink); background: var(--bg); color: var(--ink); }
+  input[type="file"] { font: inherit; font-size: 13px; max-width: 100%; color: var(--ink); }
+  textarea { font-family: var(--font-mono); font-size: 12px; line-height: 1.5; width: 100%; min-height: 260px; padding: 10px; border: 2px solid var(--ink); background: var(--bg); color: var(--ink); resize: vertical; tab-size: 2; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .check { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+  .check input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .msg { min-height: 1.5em; font-size: 13px; color: var(--muted); }
+  .msg.err { color: var(--accent); font-weight: 700; }
+</style>
+
+<main class="app">
+  <header class="top">
+    <div>
+      <p class="eyebrow" id="phaseLabel">PHASE 1</p>
+      <h1>Sweet Spot Clicker</h1>
+    </div>
+    <div class="score">
+      <span class="score-label">ポイント</span>
+      <span class="score-num" id="score">0</span>
+    </div>
+  </header>
+
+  <section class="board" id="board">
+    <div class="stage-col">
+      <div class="stage" id="stage" role="img" aria-label="メインビジュアル。クリックでポイントを獲得できます">
+        <img id="art" alt="" draggable="false">
+        <div class="layer" id="debugLayer" hidden></div>
+        <div class="layer" id="fx"></div>
+        <div class="layer"><div class="pick-mark" id="pickMark" hidden></div></div>
+      </div>
+      <p class="hint" id="hint">画像をクリックするとポイントが入ります。反応が違う場所が、隠れた弱点です。</p>
+      <p class="picker-out" id="pickerOut" hidden></p>
+    </div>
+
+    <aside class="side">
+      <div class="stats">
+        <div><span class="stat-label">クリック</span><span class="stat-val" id="stClicks">0</span></div>
+        <div><span class="stat-label">発見</span><span class="stat-val" id="stFound">0/0</span></div>
+        <div><span class="stat-label">ヒット率</span><span class="stat-val" id="stRate">-</span></div>
+      </div>
+      <div class="goal">
+        <div class="goal-row"><span>このフェーズの目標</span><b id="goalText">0 / 0</b></div>
+        <div class="bar"><i id="goalBar"></i></div>
+      </div>
+      <div>
+        <h2>スポット図鑑</h2>
+        <ul class="spots" id="spotList"></ul>
+      </div>
+      <div class="row">
+        <button class="btn small" id="openSettings" type="button">テーマ設定</button>
+        <button class="btn small" id="restartBtn" type="button">最初からやり直す</button>
+      </div>
+    </aside>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="modal" id="clearModal" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="clearTitle">
+    <h3 id="clearTitle">フェーズクリア</h3>
+    <p id="clearReason"></p>
+    <div class="result">
+      <div><span class="stat-label">獲得ポイント</span><span class="stat-val" id="rsPoints">0</span></div>
+      <div><span class="stat-label">クリック</span><span class="stat-val" id="rsClicks">0</span></div>
+      <div><span class="stat-label">発見</span><span class="stat-val" id="rsFound">0</span></div>
+    </div>
+    <p id="clearNext"></p>
+    <div class="row"><button class="btn primary" id="nextBtn" type="button">次のフェーズへ</button></div>
+  </div>
+</div>
+
+<div class="modal" id="settingsModal" hidden>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+    <h3 id="setTitle">テーマ設定</h3>
+    <p>画像と弱点データを差し替えると、ゲームのロジックはそのままで別のテーマになります。変更は今のフェーズに反映されます。</p>
+
+    <div class="grid2">
+      <div class="field">
+        <label for="setBase">Base_Reward</label>
+        <input type="number" id="setBase" min="0" step="0.5">
+        <small>1クリックの基本報酬</small>
+      </div>
+      <div class="field">
+        <label for="setDisc">Discovery_Bonus</label>
+        <input type="number" id="setDisc" min="0" step="1">
+        <small>初回発見ボーナス</small>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="imgFile">メイン画像</label>
+      <input type="file" id="imgFile" accept="image/*">
+      <small id="sizeNote">推奨サイズは 832 x 1216 px です。</small>
+      <div class="row"><button class="btn small" id="resetImg" type="button">サンプル画像に戻す</button></div>
+    </div>
+
+    <div class="field">
+      <label for="jsonArea">フェーズ設定 (JSON)</label>
+      <textarea id="jsonArea" spellcheck="false"></textarea>
+      <small>coords は画像上のピクセル座標です。radius を省略すると標準の当たり半径を使います。</small>
+    </div>
+
+    <div class="legend">制作用ツール</div>
+    <label class="check"><input type="checkbox" id="optDebug"> 当たり判定の範囲を表示する</label>
+    <label class="check"><input type="checkbox" id="optPicker"> 座標ピッカー (クリックした位置の座標を表示。ポイントは入りません)</label>
+
+    <p class="msg" id="setMsg" role="status"></p>
+    <div class="row">
+      <button class="btn primary" id="applyBtn" type="button">JSONを適用</button>
+      <button class="btn" id="copyBtn" type="button">JSONをコピー</button>
+      <button class="btn" id="closeSettings" type="button">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- Placeholder art (original, drawn in code at 832 x 1216) ---------- */
+  var PALETTES = {
+    peach: { bg1: '#ffe3d6', bg2: '#ffc4b8', body: '#f6a77a', belly: '#ffe9c7', inner: '#ff9db4', cheek: '#ff7f9d', line: '#4a2a2a' },
+    mint:  { bg1: '#d8f5ea', bg2: '#a9e3d6', body: '#7fd0b4', belly: '#f1ffe8', inner: '#ffb3c7', cheek: '#ff8fb0', line: '#1f3b3a' }
+  };
+
+  function drawCreature(paletteName, mirror) {
+    var p = PALETTES[paletteName] || PALETTES.peach;
+    var W = 832, H = 1216;
+    var c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    var g = c.getContext('2d');
+    var gr = g.createLinearGradient(0, 0, 0, H);
+    gr.addColorStop(0, p.bg1); gr.addColorStop(1, p.bg2);
+    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    g.save();
+    if (mirror) { g.translate(W, 0); g.scale(-1, 1); }
+    g.fillStyle = 'rgba(255,255,255,0.35)';
+    [[90,120,34],[720,200,22],[140,980,28],[690,1100,40],[770,640,18],[60,520,20]].forEach(function (d) {
+      g.beginPath(); g.arc(d[0], d[1], d[2], 0, Math.PI * 2); g.fill();
+    });
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    g.lineWidth = 9; g.strokeStyle = p.line;
+    function ell(x, y, rx, ry, rot, fill, stroke) {
+      g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, Math.PI * 2);
+      g.fillStyle = fill; g.fill();
+      if (stroke !== false) g.stroke();
+    }
+    // tail
+    g.beginPath(); g.moveTo(620, 1040); g.bezierCurveTo(770, 1060, 810, 900, 700, 832);
+    g.lineWidth = 84; g.strokeStyle = p.line; g.stroke();
+    g.lineWidth = 66; g.strokeStyle = p.body; g.stroke();
+    g.lineWidth = 9; g.strokeStyle = p.line;
+    ell(700, 832, 44, 44, 0, p.belly);
+    // body, belly, paws
+    ell(416, 930, 270, 250, 0, p.body);
+    ell(416, 960, 170, 160, 0, p.belly, false);
+    g.lineWidth = 6; g.beginPath(); g.arc(416, 986, 13, 0.3, Math.PI - 0.3); g.stroke();
+    g.lineWidth = 9;
+    ell(290, 1140, 74, 50, 0, p.body);
+    ell(542, 1140, 74, 50, 0, p.body);
+    // ears
+    ell(215, 285, 85, 150, -0.35, p.body);
+    ell(222, 305, 44, 92, -0.35, p.inner, false);
+    ell(617, 285, 85, 150, 0.35, p.body);
+    ell(610, 305, 44, 92, 0.35, p.inner, false);
+    // head
+    ell(416, 560, 300, 270, 0, p.body);
+    // face
+    ell(318, 560, 34, 48, 0, p.line, false);
+    ell(514, 560, 34, 48, 0, p.line, false);
+    g.fillStyle = '#fff';
+    [[306,544,11],[502,544,11],[330,580,5],[526,580,5]].forEach(function (d) {
+      g.beginPath(); g.arc(d[0], d[1], d[2], 0, Math.PI * 2); g.fill();
+    });
+    g.globalAlpha = 0.85;
+    ell(232, 640, 50, 38, 0, p.cheek, false);
+    ell(600, 640, 50, 38, 0, p.cheek, false);
+    g.globalAlpha = 1;
+    ell(416, 608, 17, 12, 0, p.line, false);
+    g.lineWidth = 7; g.strokeStyle = p.line;
+    g.beginPath(); g.arc(398, 624, 18, 0, Math.PI); g.stroke();
+    g.beginPath(); g.arc(434, 624, 18, 0, Math.PI); g.stroke();
+    // tiny mole on the forehead
+    g.globalAlpha = 0.5; g.fillStyle = p.line;
+    g.beginPath(); g.arc(416, 400, 8, 0, Math.PI * 2); g.fill();
+    g.globalAlpha = 1;
+    g.restore();
+    return c.toDataURL('image/png');
+  }
+
+  var imgCache = {};
+  function resolveImage(src) {
+    if (typeof src === 'string' && src.indexOf('placeholder:') === 0) {
+      if (!imgCache[src]) {
+        var parts = src.split(':');
+        imgCache[src] = drawCreature(parts[1], parts[2] === 'mirror');
+      }
+      return imgCache[src];
+    }
+    return src;
+  }
+
+  /* ---------- Game data (everything the theme needs lives here) ---------- */
+  var SPOTS_A = [
+    { id: 'wp_001', name: '左のみみ', description: 'ぴくぴく動くやわらかい耳。', rarity: 'Common', coords: { x: 222, y: 300 }, radius: 62, reward_multiplier: 1, visual_tag: 'sparkle' },
+    { id: 'wp_002', name: '右のみみ', description: 'こちらの耳も敏感に動く。', rarity: 'Common', coords: { x: 610, y: 300 }, radius: 62, reward_multiplier: 1, visual_tag: 'sparkle' },
+    { id: 'wp_003', name: '左のほっぺ', description: 'ふにっと弾むほっぺ。', rarity: 'Rare', coords: { x: 232, y: 640 }, radius: 64, reward_multiplier: 3, visual_tag: 'heart' },
+    { id: 'wp_004', name: '右のほっぺ', description: 'つついたら赤くなった。', rarity: 'Rare', coords: { x: 600, y: 640 }, radius: 64, reward_multiplier: 3, visual_tag: 'heart' },
+    { id: 'wp_005', name: 'あしのうら', description: 'ぷにぷにの肉球。', rarity: 'Common', coords: { x: 290, y: 1140 }, radius: 60, reward_multiplier: 2, visual_tag: 'sparkle' },
+    { id: 'wp_006', name: 'おへそ', description: 'ふんわりしたおなかの中心。', rarity: 'Epic', coords: { x: 416, y: 990 }, radius: 46, reward_multiplier: 5, visual_tag: 'burst' },
+    { id: 'wp_007', name: 'しっぽのさき', description: 'くるんと巻いたしっぽの先。', rarity: 'Epic', coords: { x: 700, y: 832 }, radius: 54, reward_multiplier: 5, visual_tag: 'star' },
+    { id: 'wp_008', name: 'ひたいのほくろ', description: '小さすぎて見落としやすい。', rarity: 'Legend', coords: { x: 416, y: 400 }, radius: 30, reward_multiplier: 10, visual_tag: 'star' }
+  ];
+  function mirrorSpots(list, w) {
+    return list.map(function (s) {
+      var m = JSON.parse(JSON.stringify(s));
+      m.coords.x = w - s.coords.x;
+      m.name = s.name.replace(/[左右]/, function (ch) { return ch === '左' ? '右' : '左'; });
+      return m;
+    });
+  }
+
+  var CFG = {
+    baseReward: 1,
+    discoveryBonus: 5,
+    defaultRadius: 56,
+    phases: [
+      { name: 'もちもち・もも', image: 'placeholder:peach', size: { w: 832, h: 1216 }, targetPoints: 400, weakPoints: SPOTS_A },
+      { name: 'もちもち・ミント', image: 'placeholder:mint:mirror', size: { w: 832, h: 1216 }, targetPoints: 600, weakPoints: mirrorSpots(SPOTS_A, 832) }
+    ]
+  };
+  var DEFAULT_PHASES = JSON.parse(JSON.stringify(CFG.phases));
+
+  var RARITY_LABEL = { common: 'コモン', rare: 'レア', epic: 'エピック', legend: 'レジェンド' };
+  var RARITY_ALIAS = { common: 'common', 'コモン': 'common', rare: 'rare', 'レア': 'rare', epic: 'epic', 'エピック': 'epic', legend: 'legend', legendary: 'legend', 'レジェンド': 'legend' };
+  function rarityKey(v) { return RARITY_ALIAS[String(v || '').trim().toLowerCase()] || 'common'; }
+  var GLYPH = { sparkle: '✦', heart: '♥', star: '★', burst: '✸' };
+
+  /* ---------- State ---------- */
+  var state = { phase: 0, points: 0, phasePoints: 0, clicks: 0, hits: 0, found: new Set(), done: false, debug: false, picker: false };
+
+  function $(id) { return document.getElementById(id); }
+  var stage = $('stage'), art = $('art'), board = $('board'), fxLayer = $('fx'), debugLayer = $('debugLayer');
+  var pickMark = $('pickMark'), pickerOut = $('pickerOut'), hint = $('hint');
+  var scoreEl = $('score'), list = $('spotList'), toastEl = $('toast');
+  var clearModal = $('clearModal'), settingsModal = $('settingsModal');
+
+  function phase() { return CFG.phases[state.phase]; }
+  function fmt(n) { return String(Math.round(n * 10) / 10); }
+  function radiusOf(s) { var r = Number(s.radius); return r > 0 ? r : CFG.defaultRadius; }
+
+  /* ---------- Rendering ---------- */
+  function renderPhase() {
+    var p = phase();
+    stage.style.setProperty('--ar', p.size.w + ' / ' + p.size.h);
+    board.style.setProperty('--ratio', (p.size.w / p.size.h).toFixed(4));
+    art.src = resolveImage(p.image);
+    $('phaseLabel').textContent = 'PHASE ' + (state.phase + 1) + ' / ' + CFG.phases.length + ' · ' + p.name;
+    renderDebug();
+    renderList();
+    renderStats();
+  }
+
+  function renderDebug() {
+    var p = phase();
+    debugLayer.textContent = '';
+    debugLayer.hidden = !state.debug;
+    if (!state.debug) return;
+    p.weakPoints.forEach(function (s) {
+      var r = radiusOf(s);
+      var el = document.createElement('div');
+      el.className = 'ring';
+      el.style.setProperty('--rc', 'var(--rc-' + rarityKey(s.rarity) + ')');
+      el.style.left = (s.coords.x / p.size.w * 100) + '%';
+      el.style.top = (s.coords.y / p.size.h * 100) + '%';
+      el.style.width = (2 * r / p.size.w * 100) + '%';
+      el.style.height = (2 * r / p.size.h * 100) + '%';
+      debugLayer.appendChild(el);
+    });
+  }
+
+  function renderList(flashId) {
+    var p = phase();
+    list.textContent = '';
+    p.weakPoints.forEach(function (s) {
+      var k = rarityKey(s.rarity);
+      var found = state.found.has(s.id);
+      var li = document.createElement('li');
+      li.className = 'spot ' + (found ? 'found' : 'locked') + (flashId === s.id ? ' flash' : '');
+      li.style.setProperty('--rc', 'var(--rc-' + k + ')');
+      var pill = document.createElement('span');
+      pill.className = 'pill';
+      pill.textContent = RARITY_LABEL[k];
+      var body = document.createElement('span');
+      var name = document.createElement('span');
+      name.className = 'spot-name';
+      name.textContent = found ? s.name : '？？？';
+      var desc = document.createElement('span');
+      desc.className = 'spot-desc';
+      desc.textContent = found ? (s.description || '') : '未発見';
+      body.appendChild(name); body.appendChild(desc);
+      var mult = document.createElement('span');
+      mult.className = 'mult';
+      mult.textContent = found ? '×' + fmt(Number(s.reward_multiplier) || 0) : '';
+      li.appendChild(pill); li.appendChild(body); li.appendChild(mult);
+      list.appendChild(li);
+    });
+  }
+
+  function renderStats(bump) {
+    var p = phase();
+    scoreEl.textContent = fmt(state.points);
+    if (bump) { scoreEl.classList.remove('bump'); void scoreEl.offsetWidth; scoreEl.classList.add('bump'); }
+    $('stClicks').textContent = state.clicks;
+    $('stFound').textContent = state.found.size + '/' + p.weakPoints.length;
+    $('stRate').textContent = state.clicks ? Math.round(state.hits / state.clicks * 100) + '%' : '-';
+    var target = Number(p.targetPoints) || 0;
+    $('goalText').textContent = fmt(state.phasePoints) + ' / ' + (target || '-');
+    $('goalBar').style.width = (target ? Math.min(100, state.phasePoints / target * 100) : 0) + '%';
+  }
+
+  /* ---------- Effects ---------- */
+  function floatText(text, fx, fy, cls) {
+    var el = document.createElement('span');
+    el.className = 'float ' + (cls || '');
+    el.textContent = text;
+    el.style.left = (fx * 100 + (Math.random() - 0.5) * 4) + '%';
+    el.style.top = (fy * 100) + '%';
+    fxLayer.appendChild(el);
+    setTimeout(function () { el.remove(); }, 950);
+  }
+
+  function burst(fx, fy, tag, key) {
+    var glyph = GLYPH[tag] || GLYPH.sparkle;
+    for (var i = 0; i < 10; i++) {
+      var el = document.createElement('span');
+      var a = (i / 10) * Math.PI * 2 + Math.random() * 0.5;
+      var d = 50 + Math.random() * 60;
+      el.className = 'bit';
+      el.textContent = glyph;
+      el.style.color = 'var(--rc-' + key + ')';
+      el.style.left = (fx * 100) + '%';
+      el.style.top = (fy * 100) + '%';
+      el.style.setProperty('--dx', Math.cos(a) * d + 'px');
+      el.style.setProperty('--dy', Math.sin(a) * d + 'px');
+      el.style.setProperty('--rot', (Math.random() * 180 - 90) + 'deg');
+      fxLayer.appendChild(el);
+      setTimeout((function (n) { return function () { n.remove(); }; })(el), 800);
+    }
+  }
+
+  var toastTimer = null;
+  function toast(title, sub, key) {
+    toastEl.textContent = '';
+    var pill = document.createElement('span');
+    pill.className = 'pill';
+    pill.textContent = RARITY_LABEL[key];
+    var box = document.createElement('span');
+    var t = document.createElement('span');
+    t.className = 'toast-title';
+    t.textContent = title;
+    var s = document.createElement('span');
+    s.className = 'toast-sub';
+    s.textContent = sub;
+    box.appendChild(t); box.appendChild(s);
+    toastEl.appendChild(pill); toastEl.appendChild(box);
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2400);
+  }
+
+  /* ---------- Core logic ---------- */
+  function hitTest(x, y) {
+    var best = null, bestRatio = Infinity;
+    phase().weakPoints.forEach(function (s) {
+      var r = radiusOf(s);
+      var d = Math.hypot(x - s.coords.x, y - s.coords.y);
+      if (d <= r && d / r < bestRatio) { best = s; bestRatio = d / r; }
+    });
+    return best;
+  }
+
+  function handleClick(x, y, fx, fy) {
+    var spot = hitTest(x, y);
+    var reward = CFG.baseReward;
+    var first = false;
+    state.clicks++;
+    stage.classList.add('pop');
+    setTimeout(function () { stage.classList.remove('pop'); }, 90);
+
+    if (spot) {
+      var key = rarityKey(spot.rarity);
+      state.hits++;
+      reward += (Number(spot.reward_multiplier) || 0) * CFG.baseReward;
+      if (!state.found.has(spot.id)) {
+        first = true;
+        state.found.add(spot.id);
+        var disc = Number(spot.discovery_bonus);
+        reward += isFinite(disc) && spot.discovery_bonus !== undefined ? disc : CFG.discoveryBonus;
+      }
+      burst(fx, fy, spot.visual_tag, key);
+      floatText('+' + fmt(reward), fx, fy, 'big');
+      if (first) {
+        floatText('新スポット発見！', fx, Math.max(0.05, fy - 0.07), 'tag');
+        stage.classList.remove('flash'); void stage.offsetWidth; stage.classList.add('flash');
+        toast('新スポット発見！ ' + spot.name, (spot.description || '') + '  ×' + fmt(Number(spot.reward_multiplier) || 0), key);
+        renderList(spot.id);
+      }
+    } else {
+      floatText('+' + fmt(reward), fx, fy, '');
+    }
+
+    state.points += reward;
+    state.phasePoints += reward;
+    renderStats(true);
+    checkGoal();
+  }
+
+  function checkGoal() {
+    var p = phase();
+    var all = p.weakPoints.length > 0 && state.found.size >= p.weakPoints.length;
+    var target = Number(p.targetPoints) > 0 && state.phasePoints >= Number(p.targetPoints);
+    if (all || target) {
+      state.done = true;
+      setTimeout(function () { showClear(all ? '全てのスポットを発見しました。' : '目標ポイントに到達しました。'); }, 700);
+    }
+  }
+
+  function showClear(reason) {
+    var last = state.phase + 1 >= CFG.phases.length;
+    $('clearReason').textContent = reason;
+    $('rsPoints').textContent = fmt(state.phasePoints);
+    $('rsClicks').textContent = state.clicks;
+    $('rsFound').textContent = state.found.size + '/' + phase().weakPoints.length;
+    $('clearNext').textContent = last ? '全てのフェーズをクリアしました。最初からもう一度遊べます。' : '次は「' + CFG.phases[state.phase + 1].name + '」の弱点データを読み込みます。';
+    $('clearTitle').textContent = last ? '全フェーズクリア' : 'フェーズクリア';
+    $('nextBtn').textContent = last ? '最初から遊ぶ' : '次のフェーズへ';
+    clearModal.hidden = false;
+    $('nextBtn').focus();
+  }
+
+  function resetPhaseState() {
+    state.found = new Set();
+    state.phasePoints = 0;
+    state.clicks = 0;
+    state.hits = 0;
+    state.done = false;
+  }
+
+  function nextPhase() {
+    clearModal.hidden = true;
+    if (state.phase + 1 < CFG.phases.length) {
+      state.phase++;
+    } else {
+      state.phase = 0;
+      state.points = 0;
+    }
+    resetPhaseState();
+    renderPhase();
+  }
+
+  function restartAll() {
+    state.phase = 0;
+    state.points = 0;
+    resetPhaseState();
+    clearModal.hidden = true;
+    renderPhase();
+  }
+
+  /* ---------- Input ---------- */
+  stage.addEventListener('pointerdown', function (e) {
+    if (e.button > 0 || state.done || !clearModal.hidden || !settingsModal.hidden) return;
+    var r = art.getBoundingClientRect();
+    var fx = (e.clientX - r.left) / r.width;
+    var fy = (e.clientY - r.top) / r.height;
+    if (fx < 0 || fx > 1 || fy < 0 || fy > 1) return;
+    var p = phase();
+    var x = Math.round(fx * p.size.w);
+    var y = Math.round(fy * p.size.h);
+    if (state.picker) {
+      pickMark.hidden = false;
+      pickMark.style.left = (fx * 100) + '%';
+      pickMark.style.top = (fy * 100) + '%';
+      var snippet = '"coords": {"x": ' + x + ', "y": ' + y + '}';
+      pickerOut.hidden = false;
+      pickerOut.textContent = snippet;
+      try { navigator.clipboard.writeText(snippet).catch(function () {}); } catch (err) {}
+      return;
+    }
+    handleClick(x, y, fx, fy);
+  });
+
+  $('nextBtn').addEventListener('click', nextPhase);
+  $('restartBtn').addEventListener('click', restartAll);
+
+  /* ---------- Settings ---------- */
+  var jsonArea = $('jsonArea'), setMsg = $('setMsg');
+  function say(text, err) { setMsg.textContent = text; setMsg.className = 'msg' + (err ? ' err' : ''); }
+
+  function phaseToJson() {
+    var p = phase();
+    return JSON.stringify({ name: p.name, targetPoints: p.targetPoints, weakPoints: p.weakPoints }, null, 2);
+  }
+  function updateSizeNote() {
+    var s = phase().size;
+    $('sizeNote').textContent = '現在の画像サイズ: ' + s.w + ' x ' + s.h + ' px。座標はこのサイズ基準です。(推奨 832 x 1216)';
+  }
+  function openSettings() {
+    jsonArea.value = phaseToJson();
+    $('setBase').value = CFG.baseReward;
+    $('setDisc').value = CFG.discoveryBonus;
+    updateSizeNote();
+    say('');
+    settingsModal.hidden = false;
+    $('closeSettings').focus();
+  }
+  function closeSettings() { settingsModal.hidden = true; }
+
+  $('openSettings').addEventListener('click', openSettings);
+  $('closeSettings').addEventListener('click', closeSettings);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !settingsModal.hidden) closeSettings(); });
+
+  $('setBase').addEventListener('change', function () {
+    var v = parseFloat(this.value);
+    if (isFinite(v) && v >= 0) CFG.baseReward = v;
+  });
+  $('setDisc').addEventListener('change', function () {
+    var v = parseFloat(this.value);
+    if (isFinite(v) && v >= 0) CFG.discoveryBonus = v;
+  });
+
+  $('applyBtn').addEventListener('click', function () {
+    var o;
+    try { o = JSON.parse(jsonArea.value); } catch (e) { say('JSONの書き方に誤りがあります: ' + e.message, true); return; }
+    if (!o || !Array.isArray(o.weakPoints) || !o.weakPoints.length) { say('weakPoints に1件以上のスポットを入れてください。', true); return; }
+    var seen = {};
+    var cleaned = [];
+    for (var i = 0; i < o.weakPoints.length; i++) {
+      var s = o.weakPoints[i] || {};
+      var c = s.coords || {};
+      if (!isFinite(Number(c.x)) || !isFinite(Number(c.y))) { say((i + 1) + '件目の coords に数値の x と y を入れてください。', true); return; }
+      var id = s.id ? String(s.id) : 'wp_' + String(i + 1).padStart(3, '0');
+      if (seen[id]) { say('id "' + id + '" が重複しています。', true); return; }
+      seen[id] = true;
+      var copy = JSON.parse(JSON.stringify(s));
+      copy.id = id;
+      copy.name = s.name ? String(s.name) : 'スポット ' + (i + 1);
+      copy.coords = { x: Number(c.x), y: Number(c.y) };
+      copy.reward_multiplier = s.reward_multiplier === undefined ? 1 : Number(s.reward_multiplier) || 0;
+      cleaned.push(copy);
+    }
+    var p = phase();
+    if (o.name) p.name = String(o.name);
+    p.targetPoints = Number(o.targetPoints) || 0;
+    p.weakPoints = cleaned;
+    resetPhaseState();
+    renderPhase();
+    jsonArea.value = phaseToJson();
+    say('適用しました。このフェーズを最初から始めます。');
+  });
+
+  $('copyBtn').addEventListener('click', function () {
+    var done = function () { say('JSONをコピーしました。'); };
+    var fallback = function () { jsonArea.focus(); jsonArea.select(); say('テキストを選択しました。コピーしてください。'); };
+    try { navigator.clipboard.writeText(jsonArea.value).then(done, fallback); } catch (e) { fallback(); }
+  });
+
+  $('imgFile').addEventListener('change', function () {
+    var f = this.files && this.files[0];
+    if (!f) return;
+    if (f.type.indexOf('image/') !== 0) { say('画像ファイルを選んでください。', true); return; }
+    var fr = new FileReader();
+    fr.onload = function () {
+      var im = new Image();
+      im.onload = function () {
+        var p = phase();
+        p.image = fr.result;
+        p.size = { w: im.naturalWidth, h: im.naturalHeight };
+        renderPhase();
+        updateSizeNote();
+        var ok = im.naturalWidth === 832 && im.naturalHeight === 1216;
+        say(ok ? '画像を差し替えました。' : '画像を差し替えました。832 x 1216 以外なので、座標はこの画像のピクセル基準で指定してください。');
+      };
+      im.onerror = function () { say('画像を読み込めませんでした。', true); };
+      im.src = fr.result;
+    };
+    fr.readAsDataURL(f);
+  });
+
+  $('resetImg').addEventListener('click', function () {
+    var d = DEFAULT_PHASES[Math.min(state.phase, DEFAULT_PHASES.length - 1)];
+    var p = phase();
+    p.image = d.image;
+    p.size = { w: d.size.w, h: d.size.h };
+    renderPhase();
+    updateSizeNote();
+    say('サンプル画像に戻しました。');
+  });
+
+  $('optDebug').addEventListener('change', function () { state.debug = this.checked; renderDebug(); });
+  $('optPicker').addEventListener('change', function () {
+    state.picker = this.checked;
+    stage.classList.toggle('picking', state.picker);
+    if (!state.picker) { pickMark.hidden = true; pickerOut.hidden = true; }
+    hint.textContent = state.picker ? '座標ピッカー中です。画像をクリックすると座標が表示されます。ポイントは入りません。' : '画像をクリックするとポイントが入ります。反応が違う場所が、隠れた弱点です。';
+  });
+
+  renderPhase();
+})();
+</script>
+
+</body></html>
